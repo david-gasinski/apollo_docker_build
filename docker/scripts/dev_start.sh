@@ -18,16 +18,20 @@
 CURR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${CURR_DIR}/docker_base.sh"
 
+USER_DOCKER="apollo"
+USER_UID="1000"
+USER_GRP="apollo"
+USER_GRP_ID="1000"
 CACHE_ROOT_DIR="${APOLLO_ROOT_DIR}/.cache"
 
 DOCKER_REPO="apolloauto/apollo"
-DEV_CONTAINER="apollo_dev_${USER}"
+DEV_CONTAINER="apollo_dev_${USER_DOCKER}"
 DEV_INSIDE="in-dev-docker"
 
 SUPPORTED_ARCHS=(x86_64 aarch64)
 TARGET_ARCH="$(uname -m)"
 
-VERSION_X86_64="dev-x86_64-18.04-20221124_1708"
+VERSION_X86_64="dev-x86_64-18.04-20231128_2222"
 TESTING_VERSION_X86_64="dev-x86_64-18.04-testing-20210112_0008"
 
 VERSION_AARCH64="dev-aarch64-18.04-20201218_0030"
@@ -135,7 +139,7 @@ function parse_arguments() {
                 USER_AGREED="yes"
                 ;;
             stop)
-                info "Now, stop all Apollo containers created by ${USER} ..."
+                info "Now, stop all Apollo containers created by ${USER_DOCKER} ..."
                 stop_all_apollo_containers "-f"
                 exit 0
                 ;;
@@ -196,22 +200,32 @@ function setup_devices_and_mount_local_volumes() {
     [ -d "${CACHE_ROOT_DIR}" ] || mkdir -p "${CACHE_ROOT_DIR}"
 
     source "${APOLLO_ROOT_DIR}/scripts/apollo_base.sh"
-    setup_device
+    setup_device # 
 
-    local volumes="-v $APOLLO_ROOT_DIR:/apollo"
+    # definitiely copy
+    #local volumes="-v $APOLLO_ROOT_DIR:/apollo"
+    local volumes=""
+
+    docker_copy "${APOLLO_ROOT_DIR}" "${APOLLO_DEV_CONTAINER}:/apollo"
 
     [ -d "${APOLLO_CONFIG_HOME}" ] || mkdir -p "${APOLLO_CONFIG_HOME}"
-    volumes="-v ${APOLLO_CONFIG_HOME}:${APOLLO_CONFIG_HOME} ${volumes}"
+    #volumes="-v ${APOLLO_CONFIG_HOME}:${APOLLO_CONFIG_HOME} ${volumes}"
+
+    docker_copy "${APOLLO_CONFIG_HOME}" "${APOLLO_DEV_CONTAINER}:${APOLLO_CONFIG_HOME}"
 
     local teleop="${APOLLO_ROOT_DIR}/../apollo-teleop"
     if [ -d "${teleop}" ]; then
-        volumes="${volumes} -v ${teleop}:/apollo/modules/teleop ${volumes}"
+        #volumes="${volumes} -v ${teleop}:/apollo/modules/teleop ${volumes}"
+        docker_copy "${teleop}" "${APOLLO_DEV_CONTAINER}:/apollo/modules/teleop"
+
     fi
     local apollo_tools="${APOLLO_ROOT_DIR}/../apollo-tools"
     if [ -d "${apollo_tools}" ]; then
-        volumes="${volumes} -v ${apollo_tools}:/tools"
+        #volumes="${volumes} -v ${apollo_tools}:/tools"
+        docker_copy "${apollo_tools}" "${APOLLO_DEV_CONTAINER}:/tools"
     fi
 
+    # no need to copy, these can be mounted as they are native to each
     local os_release="$(lsb_release -rs)"
     case "${os_release}" in
         16.04)
@@ -227,6 +241,8 @@ function setup_devices_and_mount_local_volumes() {
     # if [[ "${TARGET_ARCH}" == "aarch64" && -d "${tegra_dir}" ]]; then
     #    volumes="${volumes} -v ${tegra_dir}:${tegra_dir}:ro"
     # fi
+    
+    # no need to copy
     volumes="${volumes} -v /media:/media \
                         -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
                         -v /etc/localtime:/etc/localtime:ro \
@@ -235,6 +251,20 @@ function setup_devices_and_mount_local_volumes() {
     volumes="$(tr -s " " <<<"${volumes}")"
     eval "${__retval}='${volumes}'"
 }
+
+function docker_copy() {
+    local src="$1"
+    local dest="$2"
+
+    if [ docker cp "${src}" "${dest}" >/dev/null 2>&1 ]; then
+        info "Copied ${src} to {dest}"
+    else
+        error "Failed to copy ${src} to ${dest}, exiting..."
+        exit 1
+    fi
+}
+
+
 
 function docker_pull() {
     local img="$1"
@@ -269,7 +299,7 @@ function docker_restart_volume() {
 function restart_map_volume_if_needed() {
     local map_name="$1"
     local map_version="$2"
-    local map_volume="apollo_map_volume-${map_name}_${USER}"
+    local map_volume="apollo_map_volume-${map_name}_${USER_DOCKER}"
     local map_path="/apollo/modules/map/data/${map_name}"
 
     if [[ ${MAP_VOLUMES_CONF} == *"${map_volume}"* ]]; then
@@ -308,75 +338,96 @@ function mount_map_volumes() {
 }
 
 function mount_other_volumes() {
-    info "Mount other volumes ..."
+    # no need to copy any of these
+    # only audio 
+    local temp_dir="/tmp/apollo/audio_model/"
+
+    if [ ! -d "${temp_dir}" ]; then
+        mkdir -p "${temp_dir}"
+        info "Creating tmp audio_model directory..."
+    fi
+
+    info "Copying other volumes ..."
     local volume_conf=
 
     # AUDIO
-    local audio_volume="apollo_audio_volume_${USER}"
+    local audio_volume="apollo_audio_volume_${USER_DOCKER}"
     local audio_image="${DOCKER_REPO}:data_volume-audio_model-${TARGET_ARCH}-latest"
     local audio_path="/apollo/modules/audio/data/"
     docker_restart_volume "${audio_volume}" "${audio_image}" "${audio_path}"
-    volume_conf="${volume_conf} --volume ${audio_volume}:${audio_path}"
+    #volume_conf="${volume_conf} --volume ${audio_volume}:${audio_path}"
+
+    # copy to temp directory
+    docker_copy "${audio_volume}:${audio_path} ${temp_dir}"
+    
+    # copy to final container
+    docker cp "${temp_dir}" "${DEV_CONTAINER}:${audio_path}"
+    
+    # delete in temp directory
+    rm -rf "${temp_dir}"
+
+    # delete volume
+    docker volume rm "${audio_volume}" >/dev/null 2>&1
 
     #TRAFFIC_LIGHT_DETECTION
-    local tl_detection_volume="apollo_tl_detection_volume_${USER}"
-    local tl_detection_image="${DOCKER_REPO}:traffic_light-detection_caffe_model-${TARGET_ARCH}-latest"
-    local tl_detection_path="/apollo/modules/perception/production/data/perception/camera/models/traffic_light_detection/tl_detection_caffe"
-    docker_restart_volume "${tl_detection_volume}" "${tl_detection_image}" "${tl_detection_path}"
-    volume_conf="${volume_conf} --volume ${tl_detection_volume}:${tl_detection_path}"
-
-    #TRAFFIC_LIGHT_RECOGNITION
-    local tl_horizontal_volume="apollo_tl_horizontal_volume_${USER}"
-    local tl_horizontal_image="${DOCKER_REPO}:traffic_light-horizontal_caffe_model-${TARGET_ARCH}-latest"
-    local tl_horizontal_path="/apollo/modules/perception/production/data/perception/camera/models/traffic_light_recognition/horizontal_caffe"
-    docker_restart_volume "${tl_horizontal_volume}" "${tl_horizontal_image}" "${tl_horizontal_path}"
-    volume_conf="${volume_conf} --volume ${tl_horizontal_volume}:${tl_horizontal_path}"
-
-    #TRAFFIC_LIGHT_RECOGNITION
-    local tl_quadrate_volume="apollo_tl_quadrate_volume_${USER}"
-    local tl_quadrate_image="${DOCKER_REPO}:traffic_light-quadrate_caffe_model-${TARGET_ARCH}-latest"
-    local tl_quadrate_path="/apollo/modules/perception/production/data/perception/camera/models/traffic_light_recognition/quadrate_caffe"
-    docker_restart_volume "${tl_quadrate_volume}" "${tl_quadrate_image}" "${tl_quadrate_path}"
-    volume_conf="${volume_conf} --volume ${tl_quadrate_volume}:${tl_quadrate_path}"
-
-    #TRAFFIC_LIGHT_RECOGNITION
-    local tl_recognition_volume="apollo_tl_recognition_volume_${USER}"
-    local tl_recognition_image="${DOCKER_REPO}:traffic_light-recognition_caffe_model-${TARGET_ARCH}-latest"
-    local tl_recognition_path="/apollo/modules/perception/production/data/perception/camera/models/traffic_light_recognition/vertical_caffe"
-    docker_restart_volume "${tl_recognition_volume}" "${tl_recognition_image}" "${tl_recognition_path}"
-    volume_conf="${volume_conf} --volume ${tl_recognition_volume}:${tl_recognition_path}"
-
-    #YOLO_OBSTACLE
-    local yolo_volume="yolo_obstacle_volume_${USER}"
-    local yolo_image="${DOCKER_REPO}:yolo_obstacle_model-${TARGET_ARCH}-latest"
-    local yolo_path="/apollo/modules/perception/production/data/perception/camera/models/yolo_obstacle_detector/3d-r4-half_caffe"
-    docker_restart_volume "${yolo_volume}" "${yolo_image}" "${yolo_path}"
-    volume_conf="${volume_conf} --volume ${yolo_volume}:${yolo_path}"
-
-    #CNNSEG64
-    local cnnseg_volume="cnnseg_volume_${USER}"
-    local cnnseg_image="${DOCKER_REPO}:cnnseg_caffe_model-${TARGET_ARCH}-latest"
-    local cnnseg_path="/apollo/modules/perception/production/data/perception/lidar/models/cnnseg/cnnseg64_caffe"
-    docker_restart_volume "${cnnseg_volume}" "${cnnseg_image}" "${cnnseg_path}"
-    volume_conf="${volume_conf} --volume ${cnnseg_volume}:${cnnseg_path}"
-
-    #LANE_DETECTION
-    local lane_detection_volume="lane_detection_volume_${USER}"
-    local lane_detection_image="${DOCKER_REPO}:lane_detection_model-${TARGET_ARCH}-latest"
-    local lane_detection_path="/apollo/modules/perception/production/data/perception/camera/models/lane_detector/darkSCNN_caffe"
-    docker_restart_volume "${lane_detection_volume}" "${lane_detection_image}" "${lane_detection_path}"
-    volume_conf="${volume_conf} --volume ${lane_detection_volume}:${lane_detection_path}" 
-
-    # SMOKE
-    if [[ "${TARGET_ARCH}" == "x86_64" ]]; then
-        local smoke_volume="apollo_smoke_volume_${USER}"
-        local smoke_image="${DOCKER_REPO}:smoke_volume-yolo_obstacle_detection_model-${TARGET_ARCH}-latest"
-        local smoke_path="/apollo/modules/perception/production/data/perception/camera/models/yolo_obstacle_detector/smoke_libtorch_model"
-        docker_restart_volume "${smoke_volume}" "${smoke_image}" "${smoke_path}"
-        volume_conf="${volume_conf} --volume ${smoke_volume}:${smoke_path}"
-    fi
-
-    OTHER_VOLUMES_CONF="${volume_conf}"
+    #local tl_detection_volume="apollo_tl_detection_volume_${USER_DOCKER}"
+    #local tl_detection_image="${DOCKER_REPO}:traffic_light-detection_caffe_model-${TARGET_ARCH}-latest"
+    #local tl_detection_path="/apollo/modules/perception/production/data/perception/camera/models/traffic_light_detection/tl_detection_caffe"
+    #docker_restart_volume "${tl_detection_volume}" "${tl_detection_image}" "${tl_detection_path}"
+    #volume_conf="${volume_conf} --volume ${tl_detection_volume}:${tl_detection_path}"
+#
+    ##TRAFFIC_LIGHT_RECOGNITION
+    #local tl_horizontal_volume="apollo_tl_horizontal_volume_${USER_DOCKER}"
+    #local tl_horizontal_image="${DOCKER_REPO}:traffic_light-horizontal_caffe_model-${TARGET_ARCH}-latest"
+    #local tl_horizontal_path="/apollo/modules/perception/production/data/perception/camera/models/traffic_light_recognition/horizontal_caffe"
+    #docker_restart_volume "${tl_horizontal_volume}" "${tl_horizontal_image}" "${tl_horizontal_path}"
+    #volume_conf="${volume_conf} --volume ${tl_horizontal_volume}:${tl_horizontal_path}"
+#
+    ##TRAFFIC_LIGHT_RECOGNITION
+    #local tl_quadrate_volume="apollo_tl_quadrate_volume_${USER_DOCKER}"
+    #local tl_quadrate_image="${DOCKER_REPO}:traffic_light-quadrate_caffe_model-${TARGET_ARCH}-latest"
+    #local tl_quadrate_path="/apollo/modules/perception/production/data/perception/camera/models/traffic_light_recognition/quadrate_caffe"
+    #docker_restart_volume "${tl_quadrate_volume}" "${tl_quadrate_image}" "${tl_quadrate_path}"
+    #volume_conf="${volume_conf} --volume ${tl_quadrate_volume}:${tl_quadrate_path}"
+#
+    ##TRAFFIC_LIGHT_RECOGNITION
+    #local tl_recognition_volume="apollo_tl_recognition_volume_${USER_DOCKER}"
+    #local tl_recognition_image="${DOCKER_REPO}:traffic_light-recognition_caffe_model-${TARGET_ARCH}-latest"
+    #local tl_recognition_path="/apollo/modules/perception/production/data/perception/camera/models/traffic_light_recognition/vertical_caffe"
+    #docker_restart_volume "${tl_recognition_volume}" "${tl_recognition_image}" "${tl_recognition_path}"
+    #volume_conf="${volume_conf} --volume ${tl_recognition_volume}:${tl_recognition_path}"
+#
+    ##YOLO_OBSTACLE
+    #local yolo_volume="yolo_obstacle_volume_${USER_DOCKER}"
+    #local yolo_image="${DOCKER_REPO}:yolo_obstacle_model-${TARGET_ARCH}-latest"
+    #local yolo_path="/apollo/modules/perception/production/data/perception/camera/models/yolo_obstacle_detector/3d-r4-half_caffe"
+    #docker_restart_volume "${yolo_volume}" "${yolo_image}" "${yolo_path}"
+    #volume_conf="${volume_conf} --volume ${yolo_volume}:${yolo_path}"
+#
+    ##CNNSEG64
+    #local cnnseg_volume="cnnseg_volume_${USER_DOCKER}"
+    #local cnnseg_image="${DOCKER_REPO}:cnnseg_caffe_model-${TARGET_ARCH}-latest"
+    #local cnnseg_path="/apollo/modules/perception/production/data/perception/lidar/models/cnnseg/cnnseg64_caffe"
+    #docker_restart_volume "${cnnseg_volume}" "${cnnseg_image}" "${cnnseg_path}"
+    #volume_conf="${volume_conf} --volume ${cnnseg_volume}:${cnnseg_path}"
+#
+    ##LANE_DETECTION
+    #local lane_detection_volume="lane_detection_volume_${USER_DOCKER}"
+    #local lane_detection_image="${DOCKER_REPO}:lane_detection_model-${TARGET_ARCH}-latest"
+    #local lane_detection_path="/apollo/modules/perception/production/data/perception/camera/models/lane_detector/darkSCNN_caffe"
+    #docker_restart_volume "${lane_detection_volume}" "${lane_detection_image}" "${lane_detection_path}"
+    #volume_conf="${volume_conf} --volume ${lane_detection_volume}:${lane_detection_path}" 
+#
+    ## SMOKE
+    #if [[ "${TARGET_ARCH}" == "x86_64" ]]; then
+    #    local smoke_volume="apollo_smoke_volume_${USER_DOCKER}"
+    #    local smoke_image="${DOCKER_REPO}:smoke_volume-yolo_obstacle_detection_model-${TARGET_ARCH}-latest"
+    #    local smoke_path="/apollo/modules/perception/production/data/perception/camera/models/yolo_obstacle_detector/smoke_libtorch_model"
+    #    docker_restart_volume "${smoke_volume}" "${smoke_image}" "${smoke_path}"
+    #    volume_conf="${volume_conf} --volume ${smoke_volume}:${smoke_path}"
+    #fi
+#
+    #OTHER_VOLUMES_CONF="${volume_conf}"
 }
 
 function main() {
@@ -409,19 +460,19 @@ function main() {
     info "USE_GPU_HOST: ${USE_GPU_HOST}"
 
     local local_volumes=
-    setup_devices_and_mount_local_volumes local_volumes
+    setup_devices_and_mount_local_volumes local_volumes # corrected
 
-    mount_map_volumes
-    mount_other_volumes
+    #mount_map_volumes dont care about map volumes -> will be using custom anyway
+    mount_other_volumes # corrected
 
     info "Starting Docker container \"${DEV_CONTAINER}\" ..."
 
     local local_host="$(hostname)"
     local display="${DISPLAY:-:0}"
-    local user="${USER}"
-    local uid="$(id -u)"
-    local group="$(id -g -n)"
-    local gid="$(id -g)"
+    local user="${USER_DOCKER}"
+    local uid="${USER_UID}"
+    local group="${USER_GRP}"
+    local gid="${USER_GRP_ID}"
 
     set -x
 
@@ -429,8 +480,8 @@ function main() {
         --privileged \
         --name "${DEV_CONTAINER}" \
         -e DISPLAY="${display}" \
-        -e DOCKER_USER="${user}" \
-        -e USER="${user}" \
+        -e DOCKER_USER="${USER_DOCKER}" \
+        -e USER="${USER_DOCKER}" \
         -e DOCKER_USER_ID="${uid}" \
         -e DOCKER_GRP="${group}" \
         -e DOCKER_GRP_ID="${gid}" \
@@ -438,7 +489,6 @@ function main() {
         -e USE_GPU_HOST="${USE_GPU_HOST}" \
         -e NVIDIA_VISIBLE_DEVICES=all \
         -e NVIDIA_DRIVER_CAPABILITIES=compute,video,graphics,utility \
-        ${MAP_VOLUMES_CONF} \
         ${OTHER_VOLUMES_CONF} \
         ${local_volumes} \
         --net host \
@@ -458,7 +508,8 @@ function main() {
     fi
     set +x
 
-    postrun_start_user "${DEV_CONTAINER}"
+    postrun_start_user "${DEV_CONTAINER}" # no need to run post action if using prebuilt container
+    # need to modify it to change the owner ship of copied volumes! can be done in the docker cp command?
 
     ok "Congratulations! You have successfully finished setting up Apollo Dev Environment."
     ok "To login into the newly created ${DEV_CONTAINER} container, please run the following command:"
