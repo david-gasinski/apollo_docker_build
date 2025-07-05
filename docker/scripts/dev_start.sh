@@ -513,11 +513,12 @@ function main() {
     fi
     set +x
 
-    setup_devices_and_mount_local_volumes # corrected
-    mount_other_volumes # corrected
     postrun_start_user "${DEV_CONTAINER}" # no need to run post action if using prebuilt container
     # need to modify it to change the owner ship of copied volumes! can be done in the docker cp command?
 
+    setup_devices_and_mount_local_volumes # corrected
+    mount_other_volumes # corrected
+    
     ok "Congratulations! You have successfully finished setting up Apollo Dev Environment."
     ok "To login into the newly created ${DEV_CONTAINER} container, please run the following command:"
     ok "  bash docker/scripts/dev_into.sh"
