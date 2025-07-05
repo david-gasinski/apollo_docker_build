@@ -195,7 +195,7 @@ function check_target_arch() {
 }
 
 function setup_devices_and_mount_local_volumes() {
-    local __retval="$1"
+    #local __retval="$1"
 
     [ -d "${CACHE_ROOT_DIR}" ] || mkdir -p "${CACHE_ROOT_DIR}"
 
@@ -247,9 +247,11 @@ function setup_devices_and_mount_local_volumes() {
                         -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
                         -v /etc/localtime:/etc/localtime:ro \
                         -v /usr/src:/usr/src \
-                        -v /lib/modules:/lib/modules"
+                        -v /lib/modules:/lib/modules \
+                        -v /dev:/dev"
+
     volumes="$(tr -s " " <<<"${volumes}")"
-    eval "${__retval}='${volumes}'"
+    #eval "${__retval}='${volumes}'"
 }
 
 function docker_copy() {
@@ -458,7 +460,13 @@ function main() {
     info "Determine whether host GPU is available ..."
     determine_gpu_use_host
     info "USE_GPU_HOST: ${USE_GPU_HOST}"
-    
+
+    local local_volumes="-v /media:/media \
+                        -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+                        -v /etc/localtime:/etc/localtime:ro \
+                        -v /usr/src:/usr/src \
+                        -v /lib/modules:/lib/modules \
+                        -v /dev:/dev"
     #mount_map_volumes dont care about map volumes -> will be using custom anyway
 
     info "Starting Docker container \"${DEV_CONTAINER}\" ..."
@@ -498,8 +506,6 @@ function main() {
         "${DEV_IMAGE}" \
         /bin/bash
 
-    setup_devices_and_mount_local_volumes local_volumes # corrected
-    mount_other_volumes # corrected
 
     if [ $? -ne 0 ]; then
         error "Failed to start docker container \"${DEV_CONTAINER}\" based on image: ${DEV_IMAGE}"
@@ -507,6 +513,8 @@ function main() {
     fi
     set +x
 
+    setup_devices_and_mount_local_volumes # corrected
+    mount_other_volumes # corrected
     postrun_start_user "${DEV_CONTAINER}" # no need to run post action if using prebuilt container
     # need to modify it to change the owner ship of copied volumes! can be done in the docker cp command?
 
