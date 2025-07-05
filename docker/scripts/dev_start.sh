@@ -206,23 +206,23 @@ function setup_devices_and_mount_local_volumes() {
     #local volumes="-v $APOLLO_ROOT_DIR:/apollo"
     local volumes=""
 
-    docker_copy "${APOLLO_ROOT_DIR}" "${APOLLO_DEV_CONTAINER}:/apollo"
+    docker_copy "${APOLLO_ROOT_DIR}" "${DEV_CONTAINER}:/apollo"
 
     [ -d "${APOLLO_CONFIG_HOME}" ] || mkdir -p "${APOLLO_CONFIG_HOME}"
     #volumes="-v ${APOLLO_CONFIG_HOME}:${APOLLO_CONFIG_HOME} ${volumes}"
 
-    docker_copy "${APOLLO_CONFIG_HOME}" "${APOLLO_DEV_CONTAINER}:${APOLLO_CONFIG_HOME}"
+    docker_copy "${APOLLO_CONFIG_HOME}" "${DEV_CONTAINER}:${APOLLO_CONFIG_HOME}"
 
     local teleop="${APOLLO_ROOT_DIR}/../apollo-teleop"
     if [ -d "${teleop}" ]; then
         #volumes="${volumes} -v ${teleop}:/apollo/modules/teleop ${volumes}"
-        docker_copy "${teleop}" "${APOLLO_DEV_CONTAINER}:/apollo/modules/teleop"
+        docker_copy "${teleop}" "${DEV_CONTAINER}:/apollo/modules/teleop"
 
     fi
     local apollo_tools="${APOLLO_ROOT_DIR}/../apollo-tools"
     if [ -d "${apollo_tools}" ]; then
         #volumes="${volumes} -v ${apollo_tools}:/tools"
-        docker_copy "${apollo_tools}" "${APOLLO_DEV_CONTAINER}:/tools"
+        docker_copy "${apollo_tools}" "${DEV_CONTAINER}:/tools"
     fi
 
     # no need to copy, these can be mounted as they are native to each
