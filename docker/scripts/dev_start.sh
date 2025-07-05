@@ -258,7 +258,7 @@ function docker_copy() {
     local src="$1"
     local dest="$2"
 
-    if [ docker cp "${src}" "${dest}" >/dev/null 2>&1 ]; then
+    if docker cp "${src}" "${dest}" >/dev/null 2>&1; then
         info "Copied ${src} to {dest}"
     else
         error "Failed to copy ${src} to ${dest}, exiting..."
