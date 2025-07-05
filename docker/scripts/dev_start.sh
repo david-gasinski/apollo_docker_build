@@ -458,9 +458,7 @@ function main() {
     info "Determine whether host GPU is available ..."
     determine_gpu_use_host
     info "USE_GPU_HOST: ${USE_GPU_HOST}"
-
-    local local_volumes=
-
+    
     #mount_map_volumes dont care about map volumes -> will be using custom anyway
 
     info "Starting Docker container \"${DEV_CONTAINER}\" ..."
