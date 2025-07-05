@@ -211,7 +211,7 @@ function setup_devices_and_mount_local_volumes() {
     [ -d "${APOLLO_CONFIG_HOME}" ] || mkdir -p "${APOLLO_CONFIG_HOME}"
     #volumes="-v ${APOLLO_CONFIG_HOME}:${APOLLO_CONFIG_HOME} ${volumes}"
 
-    docker_copy "${APOLLO_CONFIG_HOME}" "${DEV_CONTAINER}:${APOLLO_CONFIG_HOME}"
+    docker_copy "${APOLLO_CONFIG_HOME}" "${DEV_CONTAINER}:${APOLLO_CONFIG_HOME//${USER}/apollo}"
 
     local teleop="${APOLLO_ROOT_DIR}/../apollo-teleop"
     if [ -d "${teleop}" ]; then
