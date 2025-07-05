@@ -460,10 +460,8 @@ function main() {
     info "USE_GPU_HOST: ${USE_GPU_HOST}"
 
     local local_volumes=
-    setup_devices_and_mount_local_volumes local_volumes # corrected
 
     #mount_map_volumes dont care about map volumes -> will be using custom anyway
-    mount_other_volumes # corrected
 
     info "Starting Docker container \"${DEV_CONTAINER}\" ..."
 
@@ -501,6 +499,9 @@ function main() {
         -v /dev/null:/dev/raw1394 \
         "${DEV_IMAGE}" \
         /bin/bash
+
+    setup_devices_and_mount_local_volumes local_volumes # corrected
+    mount_other_volumes # corrected
 
     if [ $? -ne 0 ]; then
         error "Failed to start docker container \"${DEV_CONTAINER}\" based on image: ${DEV_IMAGE}"
