@@ -482,9 +482,9 @@ function main() {
 
     local local_volumes="-v /media:/media \
                          -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+                         -v /lib/modules:/lib/modules \  
                          -v /etc/localtime:/etc/localtime:ro \
                          -v /usr/src:/usr/src \
-                         -v /lib/modules:/lib/modules \  
                          -v /dev:/dev"
 
     # can be ignored as amodel is bundled with apollo in /apollo/modules/tools/amodel
@@ -521,7 +521,7 @@ function main() {
         -e USE_GPU_HOST="${USE_GPU_HOST}" \
         -e NVIDIA_VISIBLE_DEVICES=all \
         -e NVIDIA_DRIVER_CAPABILITIES=compute,video,graphics,utility \
-        "${local_volumes}" \
+        ${local_volumes} \
         --net host \
         -w /apollo \
         --add-host "${DEV_INSIDE}:127.0.0.1" \
