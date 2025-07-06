@@ -361,7 +361,7 @@ function mount_other_volumes() {
     #volume_conf="${volume_conf} --volume ${audio_volume}:${audio_path}"
 
     # copy to temp directory
-    docker_copy "${audio_volume}:${audio_path} ${temp_dir}"
+    docker_copy "${audio_volume}:${audio_path}" "${temp_dir}"
     
     # copy to final container
     docker_copy "${temp_dir}" "${DEV_CONTAINER}:${audio_path}"
