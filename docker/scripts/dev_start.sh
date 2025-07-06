@@ -276,7 +276,7 @@ function setup_devices_and_mount_local_volumes() {
     source "${APOLLO_ROOT_DIR}/scripts/apollo_base.sh"
     setup_device
 
-    docker_copy "${APOLLO_ROOT_DIR}" "${DEV_CONTAINER}:/apollo" # copy over the root dev folder
+    docker_copy "${APOLLO_ROOT_DIR}" "${DEV_CONTAINER}:/" # copy over the root dev folder
 
     # do not copy for now, need to wait until user has been created
     # [ -d "${APOLLO_CONFIG_HOME}" ] || mkdir -p "${APOLLO_CONFIG_HOME}"
