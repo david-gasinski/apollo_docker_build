@@ -276,42 +276,21 @@ function setup_devices_and_mount_local_volumes() {
     source "${APOLLO_ROOT_DIR}/scripts/apollo_base.sh"
     setup_device
 
-    local volumes="-v $APOLLO_ROOT_DIR:/apollo"
+    docker_copy "${APOLLO_ROOT_DIR}" "${DEV_CONTAINER}:/apollo" # copy over the root dev folder
 
-    [ -d "${APOLLO_CONFIG_HOME}" ] || mkdir -p "${APOLLO_CONFIG_HOME}"
-    volumes="-v ${APOLLO_CONFIG_HOME}:${APOLLO_CONFIG_HOME} ${volumes}"
+    # do not copy for now, need to wait until user has been created
+    # [ -d "${APOLLO_CONFIG_HOME}" ] || mkdir -p "${APOLLO_CONFIG_HOME}"
+    # volumes="-v ${APOLLO_CONFIG_HOME}:${APOLLO_CONFIG_HOME} ${volumes}"
 
     local teleop="${APOLLO_ROOT_DIR}/../apollo-teleop"
     if [ -d "${teleop}" ]; then
-        volumes="${volumes} -v ${teleop}:/apollo/modules/teleop ${volumes}"
+        docker_copy "${teleop}" "${DEV_CONTAINER}:/apollo/modules/teleop"
     fi
     local apollo_tools="${APOLLO_ROOT_DIR}/../apollo-tools"
     if [ -d "${apollo_tools}" ]; then
-        volumes="${volumes} -v ${apollo_tools}:/tools"
+        docker_copy "${apollo_tools}" "${DEV_CONTAINER}:/tools"
     fi
 
-    local os_release="$(lsb_release -rs)"
-    case "${os_release}" in
-        16.04)
-            warning "[Deprecated] Support for Ubuntu 16.04 will be removed" \
-                "in the near future. Please upgrade to ubuntu 18.04+."
-            volumes="${volumes} -v /dev:/dev"
-            ;;
-        18.04 | 20.04 | *)
-            volumes="${volumes} -v /dev:/dev"
-            ;;
-    esac
-    # local tegra_dir="/usr/lib/aarch64-linux-gnu/tegra"
-    # if [[ "${TARGET_ARCH}" == "aarch64" && -d "${tegra_dir}" ]]; then
-    #    volumes="${volumes} -v ${tegra_dir}:${tegra_dir}:ro"
-    # fi
-    volumes="${volumes} -v /media:/media \
-                        -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
-                        -v /etc/localtime:/etc/localtime:ro \
-                        -v /usr/src:/usr/src \
-                        -v /lib/modules:/lib/modules"
-    volumes="$(tr -s " " <<<"${volumes}")"
-    eval "${__retval}='${volumes}'"
 }
 
 function docker_copy() {
@@ -403,17 +382,49 @@ function mount_map_volumes() {
 
 # MODIFY
 function mount_other_volumes() {
-    info "Mount other volumes ..."
-    local volume_conf=
-    local TARGET_ARCH="x86_64"
+    # POTENTIAL BUG
+    # When copying into workspace using docker cp
+    # the parent folder is copied, results in the following path
+    # /apollo/{parent}/{workspace}/modules
+    # which will lead to a failed attempt at copying the audio_model
+     
+    local temp_dir="/tmp/apollo/audio_model/"
+
+    if [ ! -d "${temp_dir}" ]; then
+        mkdir -p "${temp_dir}"
+        info "Creating tmp audio_model directory..."
+    fi
+
+    info "Copying other volumes ..."
 
     # AUDIO
     local audio_volume="apollo_audio_volume_${USER}"
     local audio_image="${DOCKER_REPO}:data_volume-audio_model-${TARGET_ARCH}-latest"
     local audio_path="/apollo/modules/audio/data/"
-    docker_restart_volume "${audio_volume}" "${audio_image}" "${audio_path}"
-    volume_conf="${volume_conf} --volume ${audio_volume}:${audio_path}"
-    OTHER_VOLUMES_CONF="${volume_conf}"
+    
+    info "Creating ${audio_image} container..."
+    docker run -t -d --name ${audio_volume} ${audio_image} 
+
+    # copy to temp directory
+    docker_copy "${audio_volume}:/apollo/modules/audio/data" "${temp_dir}"
+
+    info "Copying to final docker container..."
+    
+    # copy to final container
+    docker_copy "${temp_dir}" "${DEV_CONTAINER}:${audio_path}"
+    
+    info "Removing tmp directory..."
+    # delete in temp directory
+    rm -rf "${temp_dir}"
+    rm "/tmp/apollo/audio_model"
+    rm -r "/tmp/apollo"
+
+    # stop container
+    docker container kill ${audio_volume} >/dev/null 2>&1
+    
+    # delete container
+    docker container rm ${audio_volume} >/dev/null 2>&1
+
 }
 
 function install_python_tools() {
@@ -469,15 +480,18 @@ function main() {
     determine_gpu_use_host
     info "USE_GPU_HOST: ${USE_GPU_HOST}"
 
-    local local_volumes=
-    setup_devices_and_mount_local_volumes local_volumes
+    local local_volumes="-v /media:/media \
+                        -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+                        -v /etc/localtime:/etc/localtime:ro \
+                        -v /usr/src:/usr/src \
+                        -v /lib/modules:/lib/modules \ 
+                        -v /dev:/dev"
 
-    mount_map_volumes
-    mount_other_volumes
+    # can be ignored as amodel is bundled with apollo in /apollo/modules/tools/amodel
+    # info "Installing python tools ..."
+    # install_python_tools
 
-    info "Installing python tools ..."
-    install_python_tools
-
+    # skipped due to fast mode
     info "Installing perception models ..."
     install_perception_models
 
@@ -507,8 +521,6 @@ function main() {
         -e USE_GPU_HOST="${USE_GPU_HOST}" \
         -e NVIDIA_VISIBLE_DEVICES=all \
         -e NVIDIA_DRIVER_CAPABILITIES=compute,video,graphics,utility \
-        ${MAP_VOLUMES_CONF} \
-        ${OTHER_VOLUMES_CONF} \
         ${local_volumes} \
         --net host \
         -w /apollo \
@@ -528,6 +540,10 @@ function main() {
     set +x
 
     postrun_start_user "${DEV_CONTAINER}"
+
+    setup_devices_and_mount_local_volumes
+    mount_other_volumes
+
     postrun_cross_platfrom_download "${DEV_CONTAINER}" "${CROSS_PLATFORM_FLAG}" 
 
     ok "Congratulations! You have successfully finished setting up Apollo Dev Environment."
