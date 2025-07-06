@@ -481,11 +481,11 @@ function main() {
     info "USE_GPU_HOST: ${USE_GPU_HOST}"
 
     local local_volumes="-v /media:/media \
-                        -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
-                        -v /etc/localtime:/etc/localtime:ro \
-                        -v /usr/src:/usr/src \
-                        -v /lib/modules:/lib/modules \ 
-                        -v /dev:/dev"
+                         -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+                         -v /etc/localtime:/etc/localtime:ro \
+                         -v /usr/src:/usr/src \
+                         -v /lib/modules:/lib/modules \  
+                         -v /dev:/dev"
 
     # can be ignored as amodel is bundled with apollo in /apollo/modules/tools/amodel
     # info "Installing python tools ..."
@@ -521,7 +521,7 @@ function main() {
         -e USE_GPU_HOST="${USE_GPU_HOST}" \
         -e NVIDIA_VISIBLE_DEVICES=all \
         -e NVIDIA_DRIVER_CAPABILITIES=compute,video,graphics,utility \
-        ${local_volumes} \
+        "${local_volumes}" \
         --net host \
         -w /apollo \
         --add-host "${DEV_INSIDE}:127.0.0.1" \
@@ -541,6 +541,8 @@ function main() {
 
     postrun_start_user "${DEV_CONTAINER}"
 
+    # .git folder may get copied, ensure it doesnt
+    # 3.2 GB space
     setup_devices_and_mount_local_volumes
     mount_other_volumes
 
