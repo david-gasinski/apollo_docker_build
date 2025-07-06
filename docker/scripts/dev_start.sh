@@ -482,7 +482,7 @@ function main() {
 
     local local_volumes="-v /media:/media \
                          -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
-                         -v /lib/modules:/lib/modules \  
+                         -v /lib/modules:/lib/modules \
                          -v /etc/localtime:/etc/localtime:ro \
                          -v /usr/src:/usr/src \
                          -v /dev:/dev"
