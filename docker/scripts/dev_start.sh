@@ -260,9 +260,9 @@ function docker_copy() {
     local dest="$2"
 
     if docker cp "${src}" "${dest}" >/dev/null 2>&1; then
-        info "Copied ${src} to {dest}"
+        info "Copied ${src} to ${dest}"
     else
-        error "Failed to copy ${src} to ${dest}, exiting..."
+        error "Failed to copy ${src} to ${dest} exiting..."
         exit 1
     fi
 }
@@ -360,6 +360,9 @@ function mount_other_volumes() {
     docker_restart_volume "${audio_volume}" "${audio_image}" "${audio_path}"
     #volume_conf="${volume_conf} --volume ${audio_volume}:${audio_path}"
 
+    if [ ! -d "${temp_dir}" ]; then
+        mkdir -p "${temp_dir}"
+    fi
     # copy to temp directory
     docker_copy "${audio_volume}:${audio_path}" "${temp_dir}"
     
