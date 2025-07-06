@@ -364,7 +364,7 @@ function mount_other_volumes() {
         mkdir -p "${temp_dir}"
     fi
     # copy to temp directory
-    docker_copy "${audio_volume}:${audio_path}" "${temp_dir}"
+    docker_copy "${audio_volume}:/" "${temp_dir}"
     
     # copy to final container
     docker_copy "${temp_dir}" "${DEV_CONTAINER}:${audio_path}"
