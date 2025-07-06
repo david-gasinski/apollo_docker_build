@@ -357,23 +357,35 @@ function mount_other_volumes() {
     local audio_volume="apollo_audio_volume_${USER_DOCKER}"
     local audio_image="${DOCKER_REPO}:data_volume-audio_model-${TARGET_ARCH}-latest"
     local audio_path="/apollo/modules/audio/data/"
-    docker_restart_volume "${audio_volume}" "${audio_image}" "${audio_path}"
-    #volume_conf="${volume_conf} --volume ${audio_volume}:${audio_path}"
-
+    
+    # create a docker container with the audio image
+    info "Started Audio model container..."
+    docker run -t -d --name ${audio_volume} ${audio_image} 
+    
     if [ ! -d "${temp_dir}" ]; then
         mkdir -p "${temp_dir}"
     fi
+
+    info "Copying to temp directory..."
+    
     # copy to temp directory
     docker_copy "${audio_volume}:/" "${temp_dir}"
     
+    info "Copying to final docker container..."
     # copy to final container
     docker_copy "${temp_dir}" "${DEV_CONTAINER}:${audio_path}"
     
+    info "Removing temp directory..."
     # delete in temp directory
     rm -rf "${temp_dir}"
+    rm "/tmp/apollo/audio_model"
+    rm /tmp/apollo
 
-    # delete volume
-    docker volume rm "${audio_volume}" >/dev/null 2>&1
+    # stop container
+    docker container kill ${audio_volume} >/dev/null 2>&1
+    # delete container
+    docker container rm ${audio_volume} >/dev/null 2>&1
+
 
     #TRAFFIC_LIGHT_DETECTION
     #local tl_detection_volume="apollo_tl_detection_volume_${USER_DOCKER}"
