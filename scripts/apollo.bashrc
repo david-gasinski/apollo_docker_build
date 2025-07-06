@@ -17,6 +17,7 @@
 ###############################################################################
 
 APOLLO_ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+APOLLO_ROOT_DIR_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 APOLLO_IN_DOCKER=false
 
 # If inside docker container

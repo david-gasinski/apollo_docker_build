@@ -24,6 +24,8 @@ USER_GRP="apollo"
 USER_GRP_ID="1000"
 CACHE_ROOT_DIR="${APOLLO_ROOT_DIR}/.cache"
 
+GIT_REPO="apollo_docker_build" # set to "" if using repo named "apollo"
+
 DOCKER_REPO="apolloauto/apollo"
 DEV_CONTAINER="apollo_dev_${USER_DOCKER}"
 DEV_INSIDE="in-dev-docker"
@@ -211,7 +213,7 @@ function setup_devices_and_mount_local_volumes() {
     #local volumes="-v $APOLLO_ROOT_DIR:/apollo"
     local volumes=""
 
-    docker_copy "${APOLLO_ROOT_DIR}" "${DEV_CONTAINER}:/apollo"
+    docker_copy "${APOLLO_ROOT_DIR}/${GIT_REPO}" "${DEV_CONTAINER}:/apollo"
 
    
     local teleop="${APOLLO_ROOT_DIR}/../apollo-teleop"
