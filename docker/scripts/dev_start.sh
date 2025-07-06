@@ -194,6 +194,11 @@ function check_target_arch() {
     exit 1
 }
 
+function copy_apollo_env_config() {
+    [ -d "${APOLLO_CONFIG_HOME}" ] || mkdir -p "${APOLLO_CONFIG_HOME}"
+    docker_copy "${APOLLO_CONFIG_HOME}" "${DEV_CONTAINER}:${APOLLO_CONFIG_HOME//${USER}/apollo}"
+}
+
 function setup_devices_and_mount_local_volumes() {
     #local __retval="$1"
 
@@ -208,11 +213,7 @@ function setup_devices_and_mount_local_volumes() {
 
     docker_copy "${APOLLO_ROOT_DIR}" "${DEV_CONTAINER}:/apollo"
 
-    [ -d "${APOLLO_CONFIG_HOME}" ] || mkdir -p "${APOLLO_CONFIG_HOME}"
-    #volumes="-v ${APOLLO_CONFIG_HOME}:${APOLLO_CONFIG_HOME} ${volumes}"
-
-    docker_copy "${APOLLO_CONFIG_HOME}" "${DEV_CONTAINER}:${APOLLO_CONFIG_HOME//${USER}/apollo}"
-
+   
     local teleop="${APOLLO_ROOT_DIR}/../apollo-teleop"
     if [ -d "${teleop}" ]; then
         #volumes="${volumes} -v ${teleop}:/apollo/modules/teleop ${volumes}"
@@ -513,12 +514,14 @@ function main() {
     fi
     set +x
 
+    setup_devices_and_mount_local_volumes # corrected
+    mount_other_volumes # corrected
+
     postrun_start_user "${DEV_CONTAINER}" # no need to run post action if using prebuilt container
     # need to modify it to change the owner ship of copied volumes! can be done in the docker cp command?
 
-    setup_devices_and_mount_local_volumes # corrected
-    mount_other_volumes # corrected
-    
+    copy_apollo_env_config
+
     ok "Congratulations! You have successfully finished setting up Apollo Dev Environment."
     ok "To login into the newly created ${DEV_CONTAINER} container, please run the following command:"
     ok "  bash docker/scripts/dev_into.sh"
