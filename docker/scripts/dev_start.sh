@@ -278,10 +278,6 @@ function setup_devices_and_mount_local_volumes() {
 
     docker_copy "${APOLLO_ROOT_DIR}" "${DEV_CONTAINER}:/" # copy over the root dev folder
 
-    # do not copy for now, need to wait until user has been created
-    # [ -d "${APOLLO_CONFIG_HOME}" ] || mkdir -p "${APOLLO_CONFIG_HOME}"
-    # volumes="-v ${APOLLO_CONFIG_HOME}:${APOLLO_CONFIG_HOME} ${volumes}"
-
     local teleop="${APOLLO_ROOT_DIR}/../apollo-teleop"
     if [ -d "${teleop}" ]; then
         docker_copy "${teleop}" "${DEV_CONTAINER}:/apollo/modules/teleop"
@@ -379,6 +375,12 @@ function mount_map_volumes() {
         done
     fi
 }
+
+function copy_env_config() {
+     # do not copy for now, need to wait until user has been created
+    [ -d "${APOLLO_CONFIG_HOME}" ] || mkdir -p "${APOLLO_CONFIG_HOME}"
+    docker_copy "${APOLLO_CONFIG_HOME}" "${DEV_CONTAINER}:${APOLLO_CONFIG_HOME}//${USER}/${CUSTOM_USER}"
+ }
 
 # MODIFY
 function mount_other_volumes() {
@@ -538,12 +540,13 @@ function main() {
         exit 1
     fi
     set +x
+    setup_devices_and_mount_local_volumes
 
     postrun_start_user "${DEV_CONTAINER}"
 
+    copy_env_config
     # .git folder may get copied, ensure it doesnt
     # 3.2 GB space
-    setup_devices_and_mount_local_volumes
     mount_other_volumes
 
     postrun_cross_platfrom_download "${DEV_CONTAINER}" "${CROSS_PLATFORM_FLAG}" 
