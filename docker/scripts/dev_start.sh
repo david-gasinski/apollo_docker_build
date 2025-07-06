@@ -379,7 +379,7 @@ function mount_map_volumes() {
 function copy_env_config() {
      # do not copy for now, need to wait until user has been created
     [ -d "${APOLLO_CONFIG_HOME}" ] || mkdir -p "${APOLLO_CONFIG_HOME}"
-    docker_copy "${APOLLO_CONFIG_HOME}" "${DEV_CONTAINER}:${APOLLO_CONFIG_HOME}//${USER}/${CUSTOM_USER}"
+    docker_copy "${APOLLO_CONFIG_HOME}" "${DEV_CONTAINER}:${APOLLO_CONFIG_HOME//"${USER}"/"${CUSTOM_USER}"}"
  }
 
 # MODIFY
