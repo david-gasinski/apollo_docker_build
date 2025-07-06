@@ -369,7 +369,7 @@ function mount_other_volumes() {
     info "Copying to temp directory..."
     
     # copy to temp directory
-    docker_copy "${audio_volume}:/" "${temp_dir}"
+    docker_copy "${audio_volume}:/apollo/modules/audio/data" "${temp_dir}"
     
     info "Copying to final docker container..."
     # copy to final container
