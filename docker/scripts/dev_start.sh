@@ -356,7 +356,7 @@ function mount_other_volumes() {
     # AUDIO
     local audio_volume="apollo_audio_volume_${USER_DOCKER}"
     local audio_image="${DOCKER_REPO}:data_volume-audio_model-${TARGET_ARCH}-latest"
-    local audio_path="/apollo/modules/audio/data/"
+    local audio_path="/apollo/modules/audio/data"
     
     # create a docker container with the audio image
     info "Started Audio model container..."
