@@ -267,6 +267,7 @@ function check_target_arch() {
     exit 1
 }
 
+# MODIFY
 function setup_devices_and_mount_local_volumes() {
     local __retval="$1"
 
@@ -312,6 +313,19 @@ function setup_devices_and_mount_local_volumes() {
     volumes="$(tr -s " " <<<"${volumes}")"
     eval "${__retval}='${volumes}'"
 }
+
+function docker_copy() {
+    local src="$1"
+    local dest="$2"
+
+    if docker cp "${src}" "${dest}" >/dev/null 2>&1; then
+        info "Copied ${src} to ${dest}"
+    else
+        error "Failed to copy ${src} to ${dest} exiting..."
+        exit 1
+    fi
+}
+
 
 function docker_pull() {
     local img="$1"
@@ -367,6 +381,7 @@ function restart_map_volume_if_needed() {
     fi
 }
 
+# NO NEED TO MOUNT MAP VOLUMES
 function mount_map_volumes() {
     info "Starting mounting map volumes ..."
     if [ -n "${USER_SPECIFIED_MAPS}" ]; then
@@ -386,6 +401,7 @@ function mount_map_volumes() {
     fi
 }
 
+# MODIFY
 function mount_other_volumes() {
     info "Mount other volumes ..."
     local volume_conf=
